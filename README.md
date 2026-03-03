@@ -1,4 +1,4 @@
-# Middle America Job Search Agent
+# Job Search Agent
 
 An autonomous AI agent for searching **AI Engineer jobs at mid-sized "Middle America" companies** (not big tech or startups). The agent filters out FAANG+, excludes startups, ranks jobs by profile match, and generates tailored application materials.
 
@@ -7,8 +7,6 @@ An autonomous AI agent for searching **AI Engineer jobs at mid-sized "Middle Ame
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![React](https://img.shields.io/badge/React-18-61DAFB.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
-
 ## Quick Start (TL;DR)
 
 ```bash
@@ -829,7 +827,3 @@ This tool scrapes publicly available job listings from LinkedIn. Please use resp
 - GitHub: [@AdithyaReddyGeeda](https://github.com/AdithyaReddyGeeda)
 
 ---
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
