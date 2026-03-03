@@ -105,7 +105,7 @@ class LinkedInScraper:
         """Build the LinkedIn jobs search URL with query parameters."""
         params = {
             "keywords": keyword,
-            "location": location,
+            "location": (location or "").strip(),
             "start": start,
         }
 

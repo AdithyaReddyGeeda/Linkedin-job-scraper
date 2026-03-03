@@ -11,6 +11,7 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { CompanyInfoModal } from './components/CompanyInfoModal';
 import { useTheme } from './hooks/useTheme';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useDetectedLocation } from './hooks/useDetectedLocation';
 import { searchJobsMultiSource } from './services/api';
 import type { Job, SearchFilters, SearchHistoryItem, SavedJob, AppliedJob } from './types/job';
 
@@ -37,6 +38,13 @@ function App() {
   const [pendingSearch, setPendingSearch] = useState<Partial<SearchFilters> | null>(null);
   const [lastFilters, setLastFilters] = useState<SearchFilters | null>(null);
 
+  const { location: detectedLocation } = useDetectedLocation();
+
+  const effectiveLocation = (loc: string) => {
+    if (!loc || loc === 'United States') return detectedLocation || 'United States';
+    return loc;
+  };
+
   const totalPages = Math.ceil(jobs.length / ITEMS_PER_PAGE);
   const paginatedJobs = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -51,13 +59,25 @@ function App() {
     setLastFilters(filters);
 
     try {
-      const response = await searchJobsMultiSource(filters);
-      setJobs(response.jobs);
-      setSearchMeta({ 
-        keyword: response.keyword, 
-        location: response.location,
-        sources: response.sources,
-        jobsBySource: response.jobs_by_source,
+      // Fetch a small batch first so results show quickly (one source, low limit).
+      const initialLimit = 6;
+      const fullLimit = Math.min(filters.limit, 20);
+
+      const searchLocation = effectiveLocation(filters.location);
+
+      const initialResponse = await searchJobsMultiSource({
+        ...filters,
+        location: searchLocation,
+        limit: initialLimit,
+        details: false,
+      });
+
+      setJobs(initialResponse.jobs);
+      setSearchMeta({
+        keyword: initialResponse.keyword,
+        location: initialResponse.location,
+        sources: initialResponse.sources,
+        jobsBySource: initialResponse.jobs_by_source,
       });
 
       const historyItem: SearchHistoryItem = {
@@ -65,14 +85,45 @@ function App() {
         keyword: filters.keyword,
         location: filters.location,
         timestamp: new Date().toISOString(),
-        resultCount: response.jobs.length,
+        resultCount: initialResponse.jobs.length,
       };
       setSearchHistory(prev => {
         const filtered = prev.filter(h => !(h.keyword === filters.keyword && h.location === filters.location));
         return [historyItem, ...filtered].slice(0, 10);
       });
+
+      if (fullLimit > initialLimit) {
+        (async () => {
+          try {
+            const fullResponse = await searchJobsMultiSource({
+              ...filters,
+              location: effectiveLocation(filters.location),
+              limit: fullLimit,
+              details: false,
+            });
+            setJobs(prevJobs => {
+              const existingUrls = new Set(prevJobs.map(j => j.job_url));
+              const additionalJobs = fullResponse.jobs.filter(j => !existingUrls.has(j.job_url));
+              return [...prevJobs, ...additionalJobs];
+            });
+            setSearchMeta({
+              keyword: fullResponse.keyword,
+              location: fullResponse.location,
+              sources: fullResponse.sources,
+              jobsBySource: fullResponse.jobs_by_source,
+            });
+          } catch (err) {
+            console.error('Failed to load additional jobs', err);
+          }
+        })();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      setError(
+        isTimeout
+          ? 'Search timed out (55s). Try selecting only LinkedIn under Sources, or fewer filters.'
+          : err instanceof Error ? err.message : 'Search failed'
+      );
       setJobs([]);
     } finally {
       setIsLoading(false);
@@ -225,10 +276,18 @@ function App() {
             {isLoading && <SkeletonList count={6} />}
 
             {hasSearched && !isLoading && !error && (
-              <JobList 
-                jobs={paginatedJobs} 
-                keyword={searchMeta.keyword} 
-                location={searchMeta.location}
+              <>
+                {searchMeta.location &&
+                  (lastFilters?.location === 'United States' || !lastFilters?.location) &&
+                  searchMeta.location !== 'United States' && (
+                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                      Showing jobs near you: <span className="font-medium text-gray-800 dark:text-gray-200">{searchMeta.location}</span>
+                    </p>
+                  )}
+                <JobList 
+                  jobs={paginatedJobs} 
+                  keyword={searchMeta.keyword} 
+                  location={searchMeta.location}
                 savedJobs={savedJobs}
                 appliedJobs={appliedJobs}
                 onSaveJob={handleSaveJob}
@@ -240,6 +299,7 @@ function App() {
                 onPageChange={handlePageChange}
                 loading={isLoading}
               />
+              </>
             )}
 
             {!hasSearched && !isLoading && (

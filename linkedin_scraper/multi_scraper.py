@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .scraper import Job, LinkedInScraper
 from .indeed_scraper import IndeedScraper
 from .greenhouse_scraper import GreenhouseScraper, GREENHOUSE_COMPANIES
+from .serpapi_scraper import SerpApiScraper
 
 
 @dataclass
@@ -30,6 +31,7 @@ class MultiSourceScraper:
         "linkedin": JobSource("LinkedIn", True),
         "indeed": JobSource("Indeed", True),
         "greenhouse": JobSource("Greenhouse", True),
+        "serpapi": JobSource("SerpAPI (Google Jobs)", True),
     }
 
     def __init__(
@@ -57,6 +59,8 @@ class MultiSourceScraper:
             self.scrapers["indeed"] = IndeedScraper(delay=delay * 1.5)
         if "greenhouse" in active_sources:
             self.scrapers["greenhouse"] = GreenhouseScraper(delay=delay * 0.5)
+        if "serpapi" in active_sources and SerpApiScraper.is_available():
+            self.scrapers["serpapi"] = SerpApiScraper()
 
     def _add_source_tag(self, job: Job, source: str) -> Job:
         """Add source information to job."""

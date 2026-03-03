@@ -14,7 +14,7 @@ export interface Job {
   source?: string;
 }
 
-export type JobSource = 'linkedin' | 'indeed' | 'greenhouse';
+export type JobSource = 'linkedin' | 'indeed' | 'greenhouse' | 'serpapi';
 
 export interface RankedJob {
   job: Job;

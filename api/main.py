@@ -291,7 +291,7 @@ async def search_jobs(
 async def search_jobs_multi_source(
     keyword: str = Query(..., description="Job title or keywords to search"),
     location: str = Query("", description="City or region"),
-    sources: str = Query("linkedin,indeed,greenhouse", description="Comma-separated sources: linkedin, indeed, greenhouse"),
+    sources: str = Query("linkedin,indeed,greenhouse", description="Comma-separated sources: linkedin, indeed, greenhouse, serpapi (optional, requires SERPAPI_API_KEY)"),
     job_type: Optional[str] = Query(None, description="full-time, part-time, contract, etc."),
     remote: Optional[str] = Query(None, description="on-site, remote, hybrid"),
     experience: Optional[str] = Query(None, description="entry-level, senior, etc."),
@@ -305,8 +305,7 @@ async def search_jobs_multi_source(
 ):
     """Search for jobs across multiple sources (LinkedIn, Indeed, Greenhouse)."""
     source_list = [s.strip().lower() for s in sources.split(",") if s.strip()]
-    valid_sources = [s for s in source_list if s in ["linkedin", "indeed", "greenhouse"]]
-    
+    valid_sources = [s for s in source_list if s in ["linkedin", "indeed", "greenhouse", "serpapi"]]
     if not valid_sources:
         valid_sources = ["linkedin", "indeed", "greenhouse"]
 
@@ -337,8 +336,6 @@ async def search_jobs_multi_source(
         if company_size:
             jobs = JobRanker.filter_by_company_size(jobs, company_size)
         
-        jobs_by_source[source] = len(jobs)
-        
         for job in jobs:
             if details:
                 scraper.fetch_job_details(job)
@@ -349,6 +346,15 @@ async def search_jobs_multi_source(
                 source=source
             )
             all_jobs.append(job_with_source)
+        jobs_by_source[source] = len(jobs)
+    
+    if location and location.strip() and location.strip().lower() != "united states":
+        loc_lower = location.strip().lower()
+        all_jobs = [j for j in all_jobs if loc_lower in (j.location or "").lower() or "remote" in (j.location or "").lower()]
+        jobs_by_source = {}
+        for j in all_jobs:
+            src = j.source or "linkedin"
+            jobs_by_source[src] = jobs_by_source.get(src, 0) + 1
 
     return MultiSourceSearchResponse(
         jobs=all_jobs,
@@ -360,32 +366,22 @@ async def search_jobs_multi_source(
     )
 
 
+def _get_sources_list():
+    from linkedin_scraper.serpapi_scraper import SerpApiScraper
+    base = [
+        {"id": "linkedin", "name": "LinkedIn", "description": "Professional job listings from LinkedIn", "features": ["easy_apply", "applicant_count", "company_size"]},
+        {"id": "indeed", "name": "Indeed", "description": "General job listings from Indeed", "features": ["salary_info", "company_reviews"]},
+        {"id": "greenhouse", "name": "Greenhouse", "description": "Direct job boards from tech companies", "features": ["direct_apply", "startup_jobs"], "companies": list(GREENHOUSE_COMPANIES.keys())[:20]},
+    ]
+    if SerpApiScraper.is_available():
+        base.append({"id": "serpapi", "name": "SerpAPI (Google Jobs)", "description": "Google Jobs via SerpAPI (aggregates multiple boards)", "features": ["fast", "no_scraping"]})
+    return base
+
+
 @app.get("/api/sources")
 async def get_available_sources():
     """Get list of available job sources."""
-    return {
-        "sources": [
-            {
-                "id": "linkedin",
-                "name": "LinkedIn",
-                "description": "Professional job listings from LinkedIn",
-                "features": ["easy_apply", "applicant_count", "company_size"]
-            },
-            {
-                "id": "indeed",
-                "name": "Indeed",
-                "description": "General job listings from Indeed",
-                "features": ["salary_info", "company_reviews"]
-            },
-            {
-                "id": "greenhouse",
-                "name": "Greenhouse",
-                "description": "Direct job boards from tech companies",
-                "features": ["direct_apply", "startup_jobs"],
-                "companies": list(GREENHOUSE_COMPANIES.keys())[:20]
-            }
-        ]
-    }
+    return {"sources": _get_sources_list()}
 
 
 @app.get("/api/sources/greenhouse/companies")

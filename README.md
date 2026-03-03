@@ -29,7 +29,14 @@ cd frontend && npm run dev
 # 5. Open http://localhost:5173 in your browser
 ```
 
-**No API keys required!** The app works fully offline with heuristic-based AI. Optionally set `OPENAI_API_KEY` for enhanced generation.
+**Requirements (before you run the commands above):**
+- Python **3.10+**
+- Node.js **18+**
+- `pip` (comes with Python)
+- `npm` (comes with Node.js)
+- `git`
+
+**No API keys required!** The app works fully offline with heuristic-based AI. Optionally set `OPENAI_API_KEY` for enhanced generation. For an optional **SerpAPI (Google Jobs)** source, set `SERPAPI_API_KEY` and use the "SerpAPI (Google Jobs)" source in the UI.
 
 ---
 
@@ -626,6 +633,16 @@ pip install PyPDF2
 - Wait a few minutes and try again
 - Reduce the number of results (limit)
 - Try different search keywords
+
+#### "Search keeps spinning for a long time"
+**Problem**: External job sites (LinkedIn / Indeed / Greenhouse) can sometimes be slow to respond.
+
+**Solution**:
+- By default, searches time out after **55 seconds** so the app doesn't hang forever
+- For fastest results:
+  - Use **LinkedIn only** under Sources
+  - Keep **limit** at 12 or 20
+  - Avoid combining too many filters at once (date posted + experience + job type)
 
 ### Getting Help
 

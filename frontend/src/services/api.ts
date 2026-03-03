@@ -13,14 +13,25 @@ import type {
 
 const API_BASE = 'http://localhost:8000';
 
+const SEARCH_TIMEOUT_MS = 55_000;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 export async function searchJobs(filters: SearchFilters): Promise<SearchResponse> {
   const params = new URLSearchParams();
   
   params.append('keyword', filters.keyword);
   if (filters.location) params.append('location', filters.location);
-  if (filters.jobType) params.append('job_type', filters.jobType);
-  if (filters.remote) params.append('remote', filters.remote);
-  if (filters.experience) params.append('experience', filters.experience);
+  const primaryJobType = (filters.jobType || '').split(',').filter(Boolean)[0];
+  const primaryRemote = (filters.remote || '').split(',').filter(Boolean)[0];
+  const primaryExperience = (filters.experience || '').split(',').filter(Boolean)[0];
+  if (primaryJobType) params.append('job_type', primaryJobType);
+  if (primaryRemote) params.append('remote', primaryRemote);
+  if (primaryExperience) params.append('experience', primaryExperience);
   if (filters.datePosted) params.append('date_posted', filters.datePosted);
   if (filters.salary) params.append('salary', filters.salary);
   if (filters.sortBy) params.append('sort_by', filters.sortBy);
@@ -47,9 +58,12 @@ export async function searchJobsMultiSource(filters: SearchFilters): Promise<Mul
   if (filters.sources && filters.sources.length > 0) {
     params.append('sources', filters.sources.join(','));
   }
-  if (filters.jobType) params.append('job_type', filters.jobType);
-  if (filters.remote) params.append('remote', filters.remote);
-  if (filters.experience) params.append('experience', filters.experience);
+  const primaryJobType = (filters.jobType || '').split(',').filter(Boolean)[0];
+  const primaryRemote = (filters.remote || '').split(',').filter(Boolean)[0];
+  const primaryExperience = (filters.experience || '').split(',').filter(Boolean)[0];
+  if (primaryJobType) params.append('job_type', primaryJobType);
+  if (primaryRemote) params.append('remote', primaryRemote);
+  if (primaryExperience) params.append('experience', primaryExperience);
   if (filters.datePosted) params.append('date_posted', filters.datePosted);
   if (filters.salary) params.append('salary', filters.salary);
   if (filters.sortBy) params.append('sort_by', filters.sortBy);
@@ -58,7 +72,7 @@ export async function searchJobsMultiSource(filters: SearchFilters): Promise<Mul
   params.append('limit', filters.limit.toString());
   if (filters.details) params.append('details', 'true');
 
-  const response = await fetch(`${API_BASE}/api/search/multi?${params}`);
+  const response = await fetchWithTimeout(`${API_BASE}/api/search/multi?${params}`);
   
   if (!response.ok) {
     throw new Error(`Multi-source search failed: ${response.statusText}`);
